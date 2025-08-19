@@ -1,45 +1,43 @@
-// maga.js
-const { default: makeWASocket, useMultiFileAuthState } = require("@adiwajshing/baileys");
-const moment = require("moment");
+const mega = require("megajs");
+const auth = {
+  email: "useg329@gmail.com",
+  password: "Thevi!@#123",
+  userAgent:
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246",
+};
 
-async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState("auth_info");
-    const sock = makeWASocket({ auth: state });
+const upload = (data, name) => {
+  return new Promise((resolve, reject) => {
+    const storage = new mega.Storage(auth);
 
-    sock.ev.on("connection.update", (update) => {
-        console.log("Connection Update:", update);
+    // Wait for storage to be ready
+    storage.on("ready", () => {
+      console.log("Storage is ready. Proceeding with upload.");
+
+      const uploadStream = storage.upload({ name, allowUploadBuffering: true });
+
+      uploadStream.on("complete", (file) => {
+        file.link((err, url) => {
+          if (err) {
+            reject(err);
+          } else {
+            storage.close();
+            resolve(url);
+          }
+        });
+      });
+
+      uploadStream.on("error", (err) => {
+        reject(err);
+      });
+
+      data.pipe(uploadStream);
     });
 
-    sock.ev.on("creds.update", saveCreds);
-
-    sock.ev.on("messages.upsert", async (msg) => {
-        const m = msg.messages[0];
-        if (!m.message) return;
-
-        const from = m.key.remoteJid;
-        const text = m.message.conversation || m.message.extendedTextMessage?.text;
-        const command = text?.toLowerCase();
-
-        console.log("Message from:", from, "->", text);
-
-        // Example commands
-        if (command === "hi") {
-            await sock.sendMessage(from, { text: "Hello 👋 I'm M.R.Gesa!" });
-        } else if (command === "menu") {
-            await sock.sendMessage(from, { text: `
-╭─「 ⚡ Bot Menu 」─╮
-│ .hi
-│ .menu
-│ .time
-│ .owner
-╰───────────────╯
-            `});
-        } else if (command === "time") {
-            await sock.sendMessage(from, { text: `⏰ Current Time: ${moment().format("YYYY-MM-DD HH:mm:ss")}` });
-        } else if (command === "owner") {
-            await sock.sendMessage(from, { text: "👨‍💻 Owner: wa.me/94784525290" });
-        }
+    storage.on("error", (err) => {
+      reject(err);
     });
-}
+  });
+};
 
-startBot();
+module.exports = { upload };
